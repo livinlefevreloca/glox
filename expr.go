@@ -28,8 +28,8 @@ func (a AstPrinter) visitTernary(expr Ternary) (any, error) {
 	}
 
 	out := fmt.Sprintf("Ternary: %s", condition) + fmt.Sprintf(
-		"\n%sLeft -> %s", strings.Repeat("\t", a.depth), left) + fmt.Sprintf(
-		"\n%sRight -> %s\n", strings.Repeat("\t", a.depth), right)
+		"\n%sLeft  -> %s", strings.Repeat("\t", a.depth), left) + fmt.Sprintf(
+		"\n%sRight -> %s", strings.Repeat("\t", a.depth), right)
 	a.depth--
 	return out, nil
 }
@@ -48,8 +48,8 @@ func (a AstPrinter) visitBinary(expr Binary) (any, error) {
 	}
 
 	out := fmt.Sprintf("Binary: %s", expr.operator.operator.lexeme) + fmt.Sprintf(
-		"\n%sLeft -> %s", strings.Repeat("\t", a.depth), left) + fmt.Sprintf(
-		"\n%sRight -> %s\n", strings.Repeat("\t", a.depth), right)
+		"\n%sLeft  -> %s", strings.Repeat("\t", a.depth), left) + fmt.Sprintf(
+		"\n%sRight -> %s", strings.Repeat("\t", a.depth), right)
 	a.depth--
 	return out, nil
 }
@@ -62,7 +62,7 @@ func (a AstPrinter) visitGrouping(expr Grouping) (any, error) {
 		return "", nil
 	}
 
-	out := fmt.Sprintf("Grouping: (\n%s%v\n", strings.Repeat("\t", a.depth), grouping)
+	out := fmt.Sprintf("Grouping: (\n%s%s\n", strings.Repeat("\t", a.depth), grouping)
 	a.depth--
 	out += fmt.Sprintf("%s)", strings.Repeat("\t", a.depth))
 	return out, nil
@@ -82,7 +82,7 @@ func (a AstPrinter) visitUnary(expr Unary) (any, error) {
 		return "", nil
 	}
 
-	return fmt.Sprintf("Unary: Right -> %s", unary), nil
+	return fmt.Sprintf("Unary: %s Right -> %s", expr.operator.lexeme, unary), nil
 }
 
 type Visitor interface {

@@ -6,7 +6,7 @@ import (
 )
 
 func isTruthy(value any) bool {
-	// If the value is nil return fals
+	// If the value is nil return false
 	if value == nil {
 		return false
 	}
@@ -81,6 +81,8 @@ func (i *Interpreter) visitBinary(expr Binary) (any, error) {
 	}
 
 	switch expr.operator.operator.tokenType {
+	case TOKEN_COMMA:
+		return right, nil
 	case TOKEN_BANG_EQUAL:
 		return left != right, nil
 	case TOKEN_EQUAL_EQUAL:
