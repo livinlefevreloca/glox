@@ -9,106 +9,144 @@ type AstPrinter struct {
 	depth int
 }
 
-func (a AstPrinter) visitTernary(expr Ternary[string]) string {
+func (a AstPrinter) visitTernary(expr Ternary) (any, error) {
 	a.depth++
-	out := fmt.Sprintf("Ternary: %s", expr.condition.accept(a)) + fmt.Sprintf(
-		"\n%sLeft -> %s", strings.Repeat("\t", a.depth), expr.left.accept(a)) + fmt.Sprintf(
-		"\n%sRight -> %s", strings.Repeat("\t", a.depth), expr.right.accept(a))
+
+	condition, err := expr.condition.accept(a)
+	if err != nil {
+		return "", err
+	}
+
+	left, err := expr.left.accept(a)
+	if err != nil {
+		return "", err
+	}
+
+	right, err := expr.right.accept(a)
+	if err != nil {
+		return "", err
+	}
+
+	out := fmt.Sprintf("Ternary: %s", condition) + fmt.Sprintf(
+		"\n%sLeft -> %s", strings.Repeat("\t", a.depth), left) + fmt.Sprintf(
+		"\n%sRight -> %s\n", strings.Repeat("\t", a.depth), right)
 	a.depth--
-	return out
+	return out, nil
 }
 
-func (a AstPrinter) visitBinary(expr Binary[string]) string {
+func (a AstPrinter) visitBinary(expr Binary) (any, error) {
 	a.depth++
+
+	left, err := expr.left.accept(a)
+	if err != nil {
+		return "", err
+	}
+
+	right, err := expr.right.accept(a)
+	if err != nil {
+		return "", err
+	}
+
 	out := fmt.Sprintf("Binary: %s", expr.operator.operator.lexeme) + fmt.Sprintf(
-		"\n%sLeft %s", strings.Repeat("\t", a.depth), expr.left.accept(a)) + fmt.Sprintf(
-		"\n%sRight -> %s", strings.Repeat("\t", a.depth), expr.right.accept(a))
+		"\n%sLeft -> %s", strings.Repeat("\t", a.depth), left) + fmt.Sprintf(
+		"\n%sRight -> %s\n", strings.Repeat("\t", a.depth), right)
 	a.depth--
-	return out
+	return out, nil
 }
 
-func (a AstPrinter) visitGrouping(expr Grouping[string]) string {
+func (a AstPrinter) visitGrouping(expr Grouping) (any, error) {
 	a.depth++
-	out := fmt.Sprintf("Grouping: (\n%s%s\n", strings.Repeat("\t", a.depth), expr.expression.accept(a))
+
+	grouping, err := expr.expression.accept(a)
+	if err != nil {
+		return "", nil
+	}
+
+	out := fmt.Sprintf("Grouping: (\n%s%v\n", strings.Repeat("\t", a.depth), grouping)
 	a.depth--
 	out += fmt.Sprintf("%s)", strings.Repeat("\t", a.depth))
-	return out
+	return out, nil
 }
 
-func (a AstPrinter) visitLiteral(expr Literal[string]) string {
-	return fmt.Sprintf("Literal: %s", expr.value.lexeme)
+func (a AstPrinter) visitLiteral(expr Literal) (any, error) {
+	return fmt.Sprintf("Literal: %s", expr.value.lexeme), nil
 }
 
-func (a AstPrinter) visitOperator(expr Operator[string]) string {
-	return fmt.Sprintf("Operator: %s", expr.operator.lexeme)
+func (a AstPrinter) visitOperator(expr Operator) (any, error) {
+	return fmt.Sprintf("Operator: %s", expr.operator.lexeme), nil
 }
 
-func (a AstPrinter) visitUnary(expr Unary[string]) string {
-	return fmt.Sprintf("Unary: Right -> %s", expr.right.accept(a))
+func (a AstPrinter) visitUnary(expr Unary) (any, error) {
+	unary, err := expr.right.accept(a)
+	if err != nil {
+		return "", nil
+	}
+
+	return fmt.Sprintf("Unary: Right -> %s", unary), nil
 }
 
-type Visitor[T comparable] interface {
-	visitTernary(expr Ternary[T]) T
-	visitBinary(expr Binary[T]) T
-	visitGrouping(expr Grouping[T]) T
-	visitLiteral(expr Literal[T]) T
-	visitOperator(expr Operator[T]) T
-	visitUnary(expr Unary[T]) T
+type Visitor interface {
+	visitTernary(expr Ternary) (any, error)
+	visitBinary(expr Binary) (any, error)
+	visitGrouping(expr Grouping) (any, error)
+	visitLiteral(expr Literal) (any, error)
+	visitOperator(expr Operator) (any, error)
+	visitUnary(expr Unary) (any, error)
 }
 
-type Expr[T comparable] interface {
-	accept(visitor Visitor[T]) string
+type Expr interface {
+	accept(visitor Visitor) (any, error)
 }
 
-type Ternary[T comparable] struct {
-	condition Expr[T]
-	left      Expr[T]
-	right     Expr[T]
+type Ternary struct {
+	condition Expr
+	left      Expr
+	right     Expr
 }
 
-func (t Ternary[T]) accept(visitor Visitor[T]) T {
+func (t Ternary) accept(visitor Visitor) (any, error) {
 	return visitor.visitTernary(t)
 }
 
-type Binary[T comparable] struct {
-	left     Expr[T]
-	operator Operator[T]
-	right    Expr[T]
+type Binary struct {
+	left     Expr
+	operator Operator
+	right    Expr
 }
 
-func (b Binary[T]) accept(visitor Visitor[T]) T {
+func (b Binary) accept(visitor Visitor) (any, error) {
 	return visitor.visitBinary(b)
 }
 
-type Grouping[T comparable] struct {
-	expression Expr[T]
+type Grouping struct {
+	expression Expr
 }
 
-func (g Grouping[T]) accept(visitor Visitor[T]) T {
+func (g Grouping) accept(visitor Visitor) (any, error) {
 	return visitor.visitGrouping(g)
 }
 
-type Literal[T comparable] struct {
+type Literal struct {
 	value Token
 }
 
-func (l Literal[T]) accept(visitor Visitor[T]) T {
+func (l Literal) accept(visitor Visitor) (any, error) {
 	return visitor.visitLiteral(l)
 }
 
-type Operator[T comparable] struct {
+type Operator struct {
 	operator Token
 }
 
-func (o Operator[T]) accept(visitor Visitor[T]) T {
+func (o Operator) accept(visitor Visitor) (any, error) {
 	return visitor.visitOperator(o)
 }
 
-type Unary[T comparable] struct {
+type Unary struct {
 	operator Token
-	right    Expr[T]
+	right    Expr
 }
 
-func (u Unary[T]) accept(visitor Visitor[T]) T {
+func (u Unary) accept(visitor Visitor) (any, error) {
 	return visitor.visitUnary(u)
 }

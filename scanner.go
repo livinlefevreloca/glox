@@ -60,7 +60,6 @@ func NewGloxScanner(source string, errorReporter func(line int, col int, message
 }
 
 func (s *GloxScanner) ScanTokens() []Token {
-	fmt.Print(string(s.source))
 	for !s.isAtEnd() {
 		s.scanToken()
 	}
@@ -252,7 +251,7 @@ func (s *GloxScanner) string() {
 		return
 	}
 	s.advance()
-	s.addTokenLiteral(TOKEN_STRING, string(s.source[s.start:s.current]))
+	s.addTokenLiteral(TOKEN_STRING, string(s.source[s.start+1:s.current-1]))
 }
 
 func (s *GloxScanner) number() {
@@ -281,7 +280,15 @@ func (s *GloxScanner) identifier() {
 	}
 	text := string(s.source[s.start:s.current])
 	if tokenType, ok := s.keywords[text]; ok {
-		s.addToken(tokenType)
+		if tokenType == TOKEN_TRUE {
+			s.addTokenLiteral(tokenType, true)
+		} else if tokenType == TOKEN_FALSE {
+			s.addTokenLiteral(tokenType, false)
+		} else if tokenType == TOKEN_NIL {
+			s.addTokenLiteral(tokenType, nil)
+		} else {
+			s.addToken(tokenType)
+		}
 	} else {
 		s.addToken(TOKEN_IDENTIFIER)
 	}

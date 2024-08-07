@@ -17,7 +17,7 @@ func NewParser(tokens []Token, reportError func(*Token, int, int, string)) Parse
 	return Parser{tokens: tokens, current: 0, errorReporter: reportError}
 }
 
-func (p *Parser) parse() (Expr[string], error) {
+func (p *Parser) parse() (Expr, error) {
 	expr, err := p.expression()
 	if err != nil {
 		return nil, err
@@ -26,11 +26,11 @@ func (p *Parser) parse() (Expr[string], error) {
 	return expr, nil
 }
 
-func (p *Parser) expression() (Expr[string], error) {
+func (p *Parser) expression() (Expr, error) {
 	return p.ternary()
 }
 
-func (p *Parser) ternary() (Expr[string], error) {
+func (p *Parser) ternary() (Expr, error) {
 	condition, err := p.block()
 	if err != nil {
 		return nil, err
@@ -45,13 +45,13 @@ func (p *Parser) ternary() (Expr[string], error) {
 			return nil, err
 		}
 		right, err := p.ternary()
-		return Ternary[string]{condition: condition, left: left, right: right}, nil
+		return Ternary{condition: condition, left: left, right: right}, nil
 	}
 
 	return condition, nil
 }
 
-func (p *Parser) block() (Expr[string], error) {
+func (p *Parser) block() (Expr, error) {
 	expr, err := p.equality()
 	if err != nil {
 		return nil, err
@@ -62,13 +62,13 @@ func (p *Parser) block() (Expr[string], error) {
 		if err != nil {
 			return nil, err
 		}
-		expr = Binary[string]{left: expr, operator: Operator[string]{operator: operator}, right: right}
+		expr = Binary{left: expr, operator: Operator{operator: operator}, right: right}
 	}
 
 	return expr, nil
 }
 
-func (p *Parser) equality() (Expr[string], error) {
+func (p *Parser) equality() (Expr, error) {
 	expr, err := p.comparison()
 	if err != nil {
 		return nil, err
@@ -80,13 +80,13 @@ func (p *Parser) equality() (Expr[string], error) {
 		if err != nil {
 			return nil, err
 		}
-		expr = Binary[string]{left: expr, operator: Operator[string]{operator: operator}, right: right}
+		expr = Binary{left: expr, operator: Operator{operator: operator}, right: right}
 	}
 
 	return expr, nil
 }
 
-func (p *Parser) comparison() (Expr[string], error) {
+func (p *Parser) comparison() (Expr, error) {
 	expr, err := p.term()
 	if err != nil {
 		return nil, err
@@ -99,13 +99,13 @@ func (p *Parser) comparison() (Expr[string], error) {
 			return nil, err
 		}
 
-		expr = Binary[string]{left: expr, operator: Operator[string]{operator: operator}, right: right}
+		expr = Binary{left: expr, operator: Operator{operator: operator}, right: right}
 	}
 
 	return expr, nil
 }
 
-func (p *Parser) term() (Expr[string], error) {
+func (p *Parser) term() (Expr, error) {
 	expr, err := p.factor()
 	if err != nil {
 		return nil, err
@@ -117,13 +117,13 @@ func (p *Parser) term() (Expr[string], error) {
 		if err != nil {
 			return nil, err
 		}
-		expr = Binary[string]{left: expr, operator: Operator[string]{operator: operator}, right: right}
+		expr = Binary{left: expr, operator: Operator{operator: operator}, right: right}
 	}
 
 	return expr, nil
 }
 
-func (p *Parser) factor() (Expr[string], error) {
+func (p *Parser) factor() (Expr, error) {
 	expr, err := p.unary()
 	if err != nil {
 		return nil, err
@@ -135,38 +135,38 @@ func (p *Parser) factor() (Expr[string], error) {
 		if err != nil {
 			return nil, err
 		}
-		expr = Binary[string]{left: expr, operator: Operator[string]{operator: operator}, right: right}
+		expr = Binary{left: expr, operator: Operator{operator: operator}, right: right}
 	}
 
 	return expr, nil
 }
 
-func (p *Parser) unary() (Expr[string], error) {
+func (p *Parser) unary() (Expr, error) {
 	if p.match(TOKEN_BANG, TOKEN_MINUS) {
 		operator := p.previous()
 		right, err := p.unary()
 		if err != nil {
 			return nil, err
 		}
-		return Unary[string]{operator: operator, right: right}, nil
+		return Unary{operator: operator, right: right}, nil
 	}
 
 	return p.primary()
 }
 
-func (p *Parser) primary() (Expr[string], error) {
+func (p *Parser) primary() (Expr, error) {
 	if p.match(TOKEN_FALSE) {
-		return Literal[string]{value: p.previous()}, nil
+		return Literal{value: p.previous()}, nil
 	}
 	if p.match(TOKEN_TRUE) {
-		return Literal[string]{value: p.previous()}, nil
+		return Literal{value: p.previous()}, nil
 	}
 	if p.match(TOKEN_NIL) {
-		return Literal[string]{value: p.previous()}, nil
+		return Literal{value: p.previous()}, nil
 	}
 
 	if p.match(TOKEN_NUMBER, TOKEN_STRING) {
-		return Literal[string]{value: p.previous()}, nil
+		return Literal{value: p.previous()}, nil
 	}
 
 	if p.match(TOKEN_LEFT_PAREN) {
@@ -178,7 +178,7 @@ func (p *Parser) primary() (Expr[string], error) {
 		if err != nil {
 			return nil, err
 		}
-		return Grouping[string]{expression: expr}, nil
+		return Grouping{expression: expr}, nil
 	}
 
 	return nil, fmt.Errorf("Expected expression. got %s", p.peek().lexeme)

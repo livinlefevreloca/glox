@@ -44,10 +44,12 @@ func runPrompt() {
 }
 
 func run(source string) {
+	fmt.Print(source)
 	scanner := NewGloxScanner(source, reportErrorScan)
 	tokens := scanner.ScanTokens()
 	fmt.Println(tokens)
 	if hadError {
+		hadError = false
 		return
 	}
 	parser := NewParser(tokens, reportErrorParse)
@@ -57,5 +59,13 @@ func run(source string) {
 		return
 	}
 	astPrinter := AstPrinter{}
-	fmt.Println(expr.accept(astPrinter))
+	treeStr, err := expr.accept(astPrinter)
+	if err != nil {
+		fmt.Println("Error printing tree: ", err)
+		return
+	}
+	fmt.Println(treeStr)
+
+	interp := Interpreter{}
+	interp.interpert(expr)
 }
