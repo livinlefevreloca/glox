@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 )
 
 func isTruthy(value any) bool {
@@ -20,16 +19,86 @@ func isTruthy(value any) bool {
 }
 
 type Interpreter struct {
-	errorContext string
+	environment Environment
 }
 
-func (i *Interpreter) interpert(expr Expr) {
-	value, err := i.evaluate(expr)
+func NewInterpreter(existingEnv *map[string]any) *Interpreter {
+
+	var env map[string]any
+	if existingEnv == nil {
+		env = make(map[string]any)
+	} else {
+		env = *existingEnv
+	}
+
+	return &Interpreter{
+		environment: Environment{values: env},
+	}
+}
+
+func (i *Interpreter) interpert(statements []Statement) (any, error) {
+	var result any
+	var err error
+	for _, statement := range statements {
+		result, err = i.execute(statement)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return result, nil
+}
+
+func (i *Interpreter) visitExpressionStatemet(stmt ExpressionStatement) (any, error) {
+	return i.evaluate(stmt.expr)
+}
+
+func (i *Interpreter) visitVarDeclarationStatement(stmt VarDeclarationStatement) (any, error) {
+	var value any
+	var err error
+	if stmt.initializer != nil {
+		value, err = i.evaluate(stmt.initializer)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	i.environment.define(stmt.name.lexeme, value)
+	return nil, nil
+}
+
+func (i *Interpreter) execute(stmt Statement) (any, error) {
+	return stmt.accept(i)
+}
+
+func (i *Interpreter) visitPrintStatement(stmt PrintStatement) (any, error) {
+	value, err := i.evaluate(stmt.expr)
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		return nil, err
 	}
 	fmt.Printf("%v\n", value)
+	return nil, nil
+}
+
+func (i *Interpreter) visitAssign(expr Assign) (any, error) {
+	value, err := i.evaluate(expr.value)
+	if err != nil {
+		return nil, err
+	}
+	err = i.environment.assign(expr.name.lexeme, value)
+	if err != nil {
+		return nil, err
+	}
+	return value, nil
+}
+
+func (i *Interpreter) visitVariable(expr Variable) (any, error) {
+	value, err := i.environment.get(expr.name.lexeme)
+	if err != nil {
+		return nil, err
+	}
+
+	return value, nil
 }
 
 func (i *Interpreter) visitLiteral(expr Literal) (any, error) {
@@ -120,12 +189,22 @@ func (i *Interpreter) visitBinary(expr Binary) (any, error) {
 	case TOKEN_SLASH:
 		left, okLeft := left.(float64)
 		right, okRight := right.(float64)
+
+		if right == 0 {
+			return fmt.Errorf(
+				"[line: %d, col: %d] Division by zero",
+				expr.operator.operator.line,
+				expr.operator.operator.col,
+			), nil
+		}
+
 		if okLeft && okRight {
 			return left / right, nil
 		}
 	case TOKEN_STAR:
 		left, okLeft := left.(float64)
 		right, okRight := right.(float64)
+
 		if okLeft && okRight {
 			return left / right, nil
 		}

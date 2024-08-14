@@ -10,17 +10,116 @@ type Parser struct {
 
 func reportErrorParse(token *Token, line int, where int, message string) {
 	fmt.Printf("[line %d, col %d] Error at %s, %s\n", line, where, token.lexeme, message)
-	hadError = true
 }
 
 func NewParser(tokens []Token, reportError func(*Token, int, int, string)) Parser {
 	return Parser{tokens: tokens, current: 0, errorReporter: reportError}
 }
 
-func (p *Parser) parse() (Expr, error) {
+func (p *Parser) parse() ([]Statement, error) {
+	var statements []Statement
+	for !p.isAtEnd() {
+		stmt, err := p.declaration()
+		if err != nil {
+			return nil, err
+		}
+		statements = append(statements, stmt)
+	}
+
+	return statements, nil
+}
+
+func (p *Parser) declaration() (Statement, error) {
+	if p.match(TOKEN_VAR) {
+		if stmt, err := p.variableDeclaration(); err != nil {
+			return nil, err
+		} else {
+			return stmt, nil
+		}
+	}
+
+	return p.statement()
+}
+
+func (p *Parser) statement() (Statement, error) {
+	if p.match(TOKEN_PRINT) {
+		return p.printStatement()
+	}
+
+	return p.expressionStatement()
+}
+
+func (p *Parser) expressionStatement() (Statement, error) {
+	expr, err := p.assignment()
+	if err != nil {
+		return nil, err
+	}
+	_, err = p.consume(TOKEN_SEMICOLON, "Expected ';' after expression.")
+	if err != nil {
+		return nil, err
+	}
+	return ExpressionStatement{expr}, nil
+}
+
+func (p *Parser) printStatement() (Statement, error) {
 	expr, err := p.expression()
 	if err != nil {
 		return nil, err
+	}
+	_, err = p.consume(TOKEN_SEMICOLON, "Expected ';' after expression.")
+	return PrintStatement{expr}, nil
+
+}
+
+func (p *Parser) declarationStatement() (Statement, error) {
+	if p.match(TOKEN_VAR) {
+		return p.variableDeclaration()
+	}
+
+	return p.statement()
+}
+
+func (p *Parser) variableDeclaration() (Statement, error) {
+	name, err := p.consume(TOKEN_IDENTIFIER, "Expect variable name.")
+	if err != nil {
+		return nil, err
+	}
+
+	var expr Expr
+	if p.match(TOKEN_EQUAL) {
+		expr, err = p.assignment()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	_, err = p.consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.")
+	if err != nil {
+		return nil, err
+	}
+
+	return VarDeclarationStatement{name: *name, initializer: expr}, nil
+}
+
+func (p *Parser) assignment() (Expr, error) {
+	expr, err := p.expression()
+	if err != nil {
+		return nil, err
+	}
+
+	if p.match(TOKEN_EQUAL) {
+		equals := p.previous()
+		value, err := p.assignment()
+		if err != nil {
+			return nil, err
+		}
+
+		if varExpr, ok := expr.(Variable); ok {
+			name := varExpr.name
+			return Assign{name, value}, nil
+		}
+
+		return nil, fmt.Errorf("Invalid assignment target: %s", equals)
 	}
 
 	return expr, nil
@@ -40,7 +139,7 @@ func (p *Parser) ternary() (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		err = p.consume(TOKEN_COLON, "Expected ':' in Ternay expression")
+		_, err = p.consume(TOKEN_COLON, "Expected ':' in Ternay expression")
 		if err != nil {
 			return nil, err
 		}
@@ -62,7 +161,7 @@ func (p *Parser) block() (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		expr = Binary{left: expr, operator: Operator{operator: operator}, right: right}
+		expr = Binary{left: expr, operator: Operator{operator: *operator}, right: right}
 	}
 
 	return expr, nil
@@ -80,7 +179,7 @@ func (p *Parser) equality() (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		expr = Binary{left: expr, operator: Operator{operator: operator}, right: right}
+		expr = Binary{left: expr, operator: Operator{operator: *operator}, right: right}
 	}
 
 	return expr, nil
@@ -99,7 +198,7 @@ func (p *Parser) comparison() (Expr, error) {
 			return nil, err
 		}
 
-		expr = Binary{left: expr, operator: Operator{operator: operator}, right: right}
+		expr = Binary{left: expr, operator: Operator{operator: *operator}, right: right}
 	}
 
 	return expr, nil
@@ -117,7 +216,7 @@ func (p *Parser) term() (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		expr = Binary{left: expr, operator: Operator{operator: operator}, right: right}
+		expr = Binary{left: expr, operator: Operator{operator: *operator}, right: right}
 	}
 
 	return expr, nil
@@ -135,7 +234,7 @@ func (p *Parser) factor() (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		expr = Binary{left: expr, operator: Operator{operator: operator}, right: right}
+		expr = Binary{left: expr, operator: Operator{operator: *operator}, right: right}
 	}
 
 	return expr, nil
@@ -148,7 +247,7 @@ func (p *Parser) unary() (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		return Unary{operator: operator, right: right}, nil
+		return Unary{operator: *operator, right: right}, nil
 	}
 
 	return p.primary()
@@ -156,17 +255,21 @@ func (p *Parser) unary() (Expr, error) {
 
 func (p *Parser) primary() (Expr, error) {
 	if p.match(TOKEN_FALSE) {
-		return Literal{value: p.previous()}, nil
+		return Literal{value: *p.previous()}, nil
 	}
 	if p.match(TOKEN_TRUE) {
-		return Literal{value: p.previous()}, nil
+		return Literal{value: *p.previous()}, nil
 	}
 	if p.match(TOKEN_NIL) {
-		return Literal{value: p.previous()}, nil
+		return Literal{value: *p.previous()}, nil
 	}
 
 	if p.match(TOKEN_NUMBER, TOKEN_STRING) {
-		return Literal{value: p.previous()}, nil
+		return Literal{value: *p.previous()}, nil
+	}
+
+	if p.match(TOKEN_IDENTIFIER) {
+		return Variable{name: *p.previous()}, nil
 	}
 
 	if p.match(TOKEN_LEFT_PAREN) {
@@ -174,7 +277,7 @@ func (p *Parser) primary() (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		err = p.consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.")
+		_, err = p.consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.")
 		if err != nil {
 			return nil, err
 		}
@@ -212,22 +315,21 @@ func (p *Parser) match(types ...int) bool {
 	return false
 }
 
-func (p *Parser) consume(tokenType int, message string) error {
+func (p *Parser) consume(tokenType int, message string) (*Token, error) {
 	if p.check(tokenType) {
-		p.advance()
-		return nil
+		return p.advance(), nil
 	}
 
 	tok := p.peek()
 	if p.isAtEnd() {
 		err := fmt.Errorf("Reached unexpected EOF")
 		p.errorReporter(&tok, tok.line, tok.col, err.Error())
-		return err
+		return nil, err
 	}
 
 	err := fmt.Errorf(message)
 	p.errorReporter(&tok, tok.line, tok.col, err.Error())
-	return fmt.Errorf(message)
+	return nil, fmt.Errorf(message)
 }
 
 func (p *Parser) check(tokenType int) bool {
@@ -237,7 +339,7 @@ func (p *Parser) check(tokenType int) bool {
 	return p.peek().tokenType == tokenType
 }
 
-func (p *Parser) advance() Token {
+func (p *Parser) advance() *Token {
 	if !p.isAtEnd() {
 		p.current++
 	}
@@ -252,6 +354,6 @@ func (p *Parser) peek() Token {
 	return p.tokens[p.current]
 }
 
-func (p *Parser) previous() Token {
-	return p.tokens[p.current-1]
+func (p *Parser) previous() *Token {
+	return &p.tokens[p.current-1]
 }
