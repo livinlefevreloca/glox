@@ -4,6 +4,7 @@ type StatementVisitor interface {
 	visitExpressionStatemet(stmt ExpressionStatement) (any, error)
 	visitPrintStatement(stmt PrintStatement) (any, error)
 	visitVarDeclarationStatement(stmt VarDeclarationStatement) (any, error)
+	visitBlockStatement(stmt BlockStatement) (any, error)
 }
 
 type Statement interface {
@@ -13,6 +14,14 @@ type Statement interface {
 type VarDeclarationStatement struct {
 	name        Token
 	initializer Expr
+}
+
+type BlockStatement struct {
+	stmts []Statement
+}
+
+func (b BlockStatement) accept(visitor StatementVisitor) (any, error) {
+	return visitor.visitBlockStatement(b)
 }
 
 func (v VarDeclarationStatement) accept(visitor StatementVisitor) (any, error) {

@@ -45,8 +45,36 @@ func (p *Parser) statement() (Statement, error) {
 	if p.match(TOKEN_PRINT) {
 		return p.printStatement()
 	}
+	if p.match(TOKEN_LEFT_BRACE) {
+		return p.blockStatement()
+	}
 
 	return p.expressionStatement()
+}
+
+func (p *Parser) blockStatement() (Statement, error) {
+	var statements []Statement
+
+	for !p.check(TOKEN_RIGHT_BRACE) {
+		next, err := p.declaration()
+		if err != nil {
+			return nil, err
+		}
+		statements = append(statements, next)
+	}
+	p.consume(TOKEN_RIGHT_BRACE, "Expected '}' after block.")
+
+	return BlockStatement{stmts: statements}, nil
+}
+
+func (p *Parser) printStatement() (Statement, error) {
+	expr, err := p.expression()
+	if err != nil {
+		return nil, err
+	}
+	_, err = p.consume(TOKEN_SEMICOLON, "Expected ';' after expression.")
+	return PrintStatement{expr}, nil
+
 }
 
 func (p *Parser) expressionStatement() (Statement, error) {
@@ -59,16 +87,6 @@ func (p *Parser) expressionStatement() (Statement, error) {
 		return nil, err
 	}
 	return ExpressionStatement{expr}, nil
-}
-
-func (p *Parser) printStatement() (Statement, error) {
-	expr, err := p.expression()
-	if err != nil {
-		return nil, err
-	}
-	_, err = p.consume(TOKEN_SEMICOLON, "Expected ';' after expression.")
-	return PrintStatement{expr}, nil
-
 }
 
 func (p *Parser) declarationStatement() (Statement, error) {

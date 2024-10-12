@@ -17,7 +17,7 @@ func NewAstPrinter(existingEnv *map[string]any) AstPrinter {
 	} else {
 		env = *existingEnv
 	}
-	return AstPrinter{depth: 0, env: Environment{values: env}}
+	return AstPrinter{depth: 0, env: Environment{name: "ASTENV", values: env}}
 }
 
 func (a AstPrinter) print(stmts []Statement) error {
@@ -34,9 +34,15 @@ func (a AstPrinter) print(stmts []Statement) error {
 
 func (a AstPrinter) visitVarDeclarationStatement(stmt VarDeclarationStatement) (any, error) {
 	a.depth++
-	expr, err := stmt.initializer.accept(a)
-	if err != nil {
-		return "", err
+	var expr any
+	var err error
+	if stmt.initializer == nil {
+		expr = nil
+	} else {
+		expr, err = stmt.initializer.accept(a)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	out := fmt.Sprintf(
@@ -47,6 +53,31 @@ func (a AstPrinter) visitVarDeclarationStatement(stmt VarDeclarationStatement) (
 		expr,
 	)
 
+	fmt.Println(expr)
+	a.env.define(stmt.name.lexeme, expr)
+
+	a.depth--
+	return out, nil
+}
+
+func (a AstPrinter) visitBlockStatement(stmt BlockStatement) (any, error) {
+	a.depth++
+	out := "BlockStatement: "
+
+	oldEnv := a.env
+	newEnv := Environment{name: fmt.Sprintf("ASTENV%d", a.depth), values: make(map[string]any), parent: &oldEnv}
+	a.env = newEnv
+
+	for _, statement := range stmt.stmts {
+		val, err := statement.accept(a)
+
+		if err != nil {
+			return "", err
+		}
+		out += fmt.Sprintf("\n%s -> %s", strings.Repeat("\t", a.depth), val)
+	}
+
+	a.env = oldEnv
 	a.depth--
 	return out, nil
 }
@@ -84,6 +115,8 @@ func (a AstPrinter) visitAssign(expr Assign) (any, error) {
 		return nil, err
 	}
 
+	a.env.assign(expr.name.lexeme, value)
+
 	return fmt.Sprintf("Assign: %s = %s", expr.name.lexeme, value), nil
 
 }
@@ -92,6 +125,12 @@ func (a AstPrinter) visitVariable(expr Variable) (any, error) {
 	value, err := a.env.get(expr.name.lexeme)
 	if err != nil {
 		return "", err
+	}
+
+	if str_value, ok := value.(string); ok {
+		if strings.Contains(str_value, "\n") {
+			value = strings.ReplaceAll(str_value, "\n", "\n\t")
+		}
 	}
 
 	return fmt.Sprintf("Variable: %s = %v", expr.name.lexeme, value), nil

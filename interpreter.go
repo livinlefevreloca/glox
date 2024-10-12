@@ -20,6 +20,7 @@ func isTruthy(value any) bool {
 
 type Interpreter struct {
 	environment Environment
+	scopeDepth  int
 }
 
 func NewInterpreter(existingEnv *map[string]any) *Interpreter {
@@ -32,7 +33,7 @@ func NewInterpreter(existingEnv *map[string]any) *Interpreter {
 	}
 
 	return &Interpreter{
-		environment: Environment{values: env},
+		environment: Environment{name: "INTENV_BASE", values: env},
 	}
 }
 
@@ -47,6 +48,10 @@ func (i *Interpreter) interpert(statements []Statement) (any, error) {
 	}
 
 	return result, nil
+}
+
+func (i *Interpreter) execute(stmt Statement) (any, error) {
+	return stmt.accept(i)
 }
 
 func (i *Interpreter) visitExpressionStatemet(stmt ExpressionStatement) (any, error) {
@@ -67,8 +72,29 @@ func (i *Interpreter) visitVarDeclarationStatement(stmt VarDeclarationStatement)
 	return nil, nil
 }
 
-func (i *Interpreter) execute(stmt Statement) (any, error) {
-	return stmt.accept(i)
+func (i *Interpreter) visitBlockStatement(stmt BlockStatement) (any, error) {
+	i.scopeDepth++
+	i.executeBlock(stmt.stmts, Environment{name: fmt.Sprintf("INTENV_%d", i.scopeDepth), values: make(map[string]any)})
+	i.scopeDepth--
+	return nil, nil
+}
+
+func (i *Interpreter) executeBlock(stmts []Statement, env Environment) error {
+	previousEnv := i.environment
+
+	env.parent = &previousEnv
+	i.environment = env
+
+	for _, stmt := range stmts {
+		_, err := i.execute(stmt)
+		if err != nil {
+			return err
+		}
+	}
+
+	i.environment = previousEnv
+
+	return nil
 }
 
 func (i *Interpreter) visitPrintStatement(stmt PrintStatement) (any, error) {
@@ -206,7 +232,7 @@ func (i *Interpreter) visitBinary(expr Binary) (any, error) {
 		right, okRight := right.(float64)
 
 		if okLeft && okRight {
-			return left / right, nil
+			return left * right, nil
 		}
 	case TOKEN_PLUS:
 		leftStr, okLeftStr := left.(string)

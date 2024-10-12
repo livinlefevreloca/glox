@@ -9,8 +9,8 @@ import (
 )
 
 var hadError bool = false
-var showTokens bool = false
-var showAst bool = false
+var showTokens bool = true
+var showAst bool = true
 var showSource bool = false
 
 func main() {
@@ -102,7 +102,7 @@ func runPrompt() {
 
 func run(source string, env *map[string]any) any {
 
-	if !strings.HasSuffix(source, ";") {
+	if !strings.HasSuffix(source, ";") && !strings.HasSuffix(source, "}") {
 		source += ";"
 	}
 
